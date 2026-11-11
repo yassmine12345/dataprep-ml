@@ -1,0 +1,51 @@
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Datasets (large data files)
+datasets/*.csv
+datasets/*.xlsx
+datasets/*.parquet
+
+# Frontend build artifacts (source of truth is frontend/src)
+frontend/dist/

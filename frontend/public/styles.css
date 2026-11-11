@@ -1,0 +1,30 @@
+/* Global styles */
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; margin: 0; }
+.navbar-brand { font-weight: 700; letter-spacing: 0.5px; }
+.card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 1.25rem; }
+.card-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; font-weight: 600; border-radius: 12px 12px 0 0 !important; }
+.card-body { padding: 1.25rem; }
+.table th { background: #f1f3f7; font-weight: 600; border-bottom: 2px solid #dee2e6; }
+.table td { vertical-align: middle; }
+.badge { font-size: 0.78rem; padding: 0.35em 0.6em; }
+.problem-card { border-left: 4px solid #dc3545; background: #fff5f5; }
+.problem-card.warning { border-color: #ffc107; background: #fffdf5; }
+.problem-card.info { border-color: #17a2b8; background: #f0fbfc; }
+.problem-card.success { border-color: #28a745; background: #f0fff4; }
+.btn-primary { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border: none; border-radius: 8px; padding: 0.5rem 1.25rem; font-weight: 600; }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-outline-primary { border-radius: 8px; }
+.stat-card { background: white; border-radius: 12px; padding: 1rem; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.stat-card .value { font-size: 1.6rem; font-weight: 700; color: #2a5298; }
+.stat-card .label { font-size: 0.8rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
+.step-indicator { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.step { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.9rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; background: #e9ecef; color: #495057; }
+.step.active { background: #1e3c72; color: white; }
+.step.done { background: #28a745; color: white; }
+.step-arrow { color: #adb5bd; }
+.form-control, .form-select { border-radius: 8px; border: 1px solid #ced4da66; }
+.form-control:focus, .form-select:focus { border-color: #2a5298; box-shadow: 0 0 0 0.2rem rgba(42,82,152,0.25); }
+.dropzone { border: 2px dashed #adb5bd; border-radius: 12px; padding: 2.5rem; text-align: center; background: #f8f9fa; transition: all 0.2s; cursor: pointer; }
+.dropzone.dragover { border-color: #2a5298; background: #eef2ff; }
+.chart-container { position: relative; height: 280px; }
+.footer { background: #1e3c72; color: white; padding: 1rem; text-align: center; margin-top: 2rem; }
