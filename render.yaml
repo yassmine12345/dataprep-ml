@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: generic-data-preprocessing
+    name: dataprep-ml
     env: python
-    buildCommand: "pip install -r backend/requirements.txt"
+    buildCommand: "pip install -r backend/requirements.txt && mkdir -p frontend/dist && cp -r frontend/public/* frontend/dist/"
     startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
