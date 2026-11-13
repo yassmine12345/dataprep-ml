@@ -18,4 +18,6 @@ ENV PORT=8080
 EXPOSE 8080
 
 WORKDIR /app/backend
-CMD exec uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# Use Python startup script so PORT/HOST are read from env via os.environ
+# (avoids shell $PORT expansion issues on platforms that pass it literally)
+CMD ["python", "-m", "app.start"]

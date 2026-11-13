@@ -3,7 +3,7 @@ services:
     name: dataprep-ml
     env: python
     buildCommand: "pip install -r backend/requirements.txt && mkdir -p frontend/dist && cp -r frontend/public/* frontend/dist/"
-    startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
+    startCommand: "python -m app.start"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
