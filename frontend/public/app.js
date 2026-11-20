@@ -1,89 +1,508 @@
-(function(){
-const e=React.createElement; const {useState,useEffect,useRef}=React;
-function Stepper({step}){const steps=['Upload','Configure','EDA','Issues','Clean','Results']; return e('div',{className:'step-indicator'},steps.map((x,i)=>[e('div',{key:'s'+i,className:'step '+(i===step?'active':i<step?'done':'')},(i<step?'OK ':'')+x),i<steps.length-1?e('span',{key:'a'+i,className:'step-arrow'},'>'):null]).flat().filter(Boolean));}
-function StatCards({items}){return e('div',{className:'row g-3 mb-3'},(items||[]).map((it,i)=>e('div',{key:i,className:'col-6 col-md-3'},e('div',{className:'stat-card'},e('div',{className:'value'},String(it.value)),e('div',{className:'label'},it.label)))));}
-function CorrHeat({cols,matrix}){if(!cols||!matrix||cols.length<2)return e('p',{className:'text-muted'},'Not enough numeric columns for correlation.');const color=(v)=>{if(v==null||isNaN(v))return'#eee';const a=Math.abs(v);const r=v>=0?42:220,g=v>=0?82:53,b=v>=0?152:69;return'rgba('+r+','+g+','+b+','+(0.15+a*0.7)+')';};return e('div',{style:{overflow:'auto'}},e('table',{className:'table table-sm table-bordered mb-0',style:{fontSize:'0.78rem'}},e('thead',null,e('tr',null,[e('th',{key:'_'},'')].concat(cols.map(c=>e('th',{key:c},c))))),e('tbody',null,matrix.map((row,i)=>e('tr',{key:cols[i]},[e('th',{key:'h'},cols[i])].concat(row.map((v,j)=>e('td',{key:j,style:{background:color(v),textAlign:'center',minWidth:56}},v==null?'':Number(v).toFixed(2)))))))));}
-function BarChart({id,labels,values,title,horizontal}){const ref=useRef(null),chartRef=useRef(null);useEffect(()=>{if(!ref.current||!labels||!labels.length)return;if(chartRef.current)chartRef.current.destroy();if(typeof Chart==='undefined')return;chartRef.current=new Chart(ref.current,{type:'bar',data:{labels,datasets:[{label:title||'Count',data:values,backgroundColor:'rgba(42,82,152,0.6)'}]},options:{indexAxis:horizontal?'y':'x',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});return ()=>{if(chartRef.current)chartRef.current.destroy()};},[labels,values,title,horizontal]);if(!labels||!labels.length)return e('p',{className:'text-muted small'},'No data.');return e('div',{className:'chart-container'},e('canvas',{ref,id}));}
+// Main App component
+const e = React.createElement;
+const { useState, useEffect, useCallback, useMemo } = React;
 
-function App(){
-  const [step,setStep]=useState(0),[busy,setBusy]=useState(false),[err,setErr]=useState(''),[notice,setNotice]=useState('');
-  const [dataset,setDataset]=useState(null),[target,setTarget]=useState(''),[task,setTask]=useState('');
-  const [eda,setEda]=useState(null),[anomalies,setAnomalies]=useState(null),[accepted,setAccepted]=useState({});
-  const [result,setResult]=useState(null),[comparison,setComparison]=useState(null);
-  const resetUI=(msg)=>{setDataset(null);setTarget('');setTask('');setEda(null);setAnomalies(null);setAccepted({});setResult(null);setComparison(null);setStep(0);setErr(''); if(msg)setNotice(msg);};
-  const onUpload=async(file)=>{if(!file) return; setErr('');setNotice('');setBusy(true); try{const res=await window.uploadFile(file); setDataset(res);setStep(1);setNotice('Uploaded: '+res.filename);}catch(ex){setErr(String(ex.message||ex));}finally{setBusy(false);}};
-  const saveConfig=async()=>{if(!dataset) return; setErr('');setBusy(true); try{await window.api('/dataset/'+dataset.dataset_id+'/target',{method:'POST',body:JSON.stringify({target:target||null})}); if(task) await window.api('/dataset/'+dataset.dataset_id+'/task',{method:'POST',body:JSON.stringify({task})}); setDataset(d=>({...d,target:target||null,task:task||null})); setStep(2);}catch(ex){setErr(String(ex.message||ex));}finally{setBusy(false);}};
-  const loadEda=async()=>{if(!dataset) return; setErr('');setBusy(true); try{setEda(await window.api('/dataset/'+dataset.dataset_id+'/eda'));}catch(ex){setErr(String(ex.message||ex));}finally{setBusy(false);}};
-  const loadAnomalies=async()=>{if(!dataset) return; setErr('');setBusy(true); try{setAnomalies(await window.api('/dataset/'+dataset.dataset_id+'/anomalies')); setStep(3);}catch(ex){setErr(String(ex.message||ex));}finally{setBusy(false);}};
-  useEffect(()=>{if(step===2&&dataset&&!eda) loadEda();},[step,dataset]);
-  const acceptProblem=(key,p)=>{if(p.recommendation==='none') return; setAccepted(a=>({...a,[key]:{type:p.recommendation,feature:p.feature==='__rows__'?null:p.feature}}));};
-  const rejectProblem=(key)=>{setAccepted(a=>{const n={...a}; delete n[key]; return n;});};
-  const customProblem=(key,method,p)=>{if(!method) return; setAccepted(a=>({...a,[key]:{type:method,feature:p.feature==='__rows__'?null:p.feature}}));};
-  const goClean=()=>setStep(4);
-  const applyOps=async()=>{if(!dataset) return; setErr('');setBusy(true); try{const ops=Object.values(accepted); await window.api('/dataset/'+dataset.dataset_id+'/operations',{method:'POST',body:JSON.stringify({operations:ops})}); const r=await window.api('/dataset/'+dataset.dataset_id+'/apply',{method:'POST'}); setResult(r); setComparison(await window.api('/dataset/'+dataset.dataset_id+'/comparison')); setStep(5); setNotice('Applied '+ops.length+' operation(s).');}catch(ex){setErr(String(ex.message||ex));}finally{setBusy(false);}};
-  const doReset=async()=>{if(!dataset) return; setErr('');setBusy(true); try{await window.api('/dataset/'+dataset.dataset_id+'/reset',{method:'POST'}); setResult(null);setComparison(null);setAccepted({});setAnomalies(null);setEda(null); setStep(2); setNotice('Reset to original.');}catch(ex){setErr(String(ex.message||ex));}finally{setBusy(false);}};
-  const doDelete=async()=>{if(!dataset) return; setErr('');setBusy(true); try{await window.api('/dataset/'+dataset.dataset_id,{method:'DELETE'}); resetUI('Dataset deleted.');}catch(ex){setErr(String(ex.message||ex));}finally{setBusy(false);}};
-  const exportRows=(rows,name)=>{window.download(name,window.csvFromRows(rows||[]),'text/csv');};
-  return e('div',null,
-    e('nav',{className:'navbar navbar-dark',style:{background:'linear-gradient(135deg,#1e3c72 0%,#2a5298 100%)'}},e('div',{className:'container-fluid'},e('span',{className:'navbar-brand mb-0 h1'},'ML Data Preprocessing & Cleaning'))),
-    e('div',{className:'container py-4'},
-      e(Stepper,{step}), err?e('div',{className:'alert alert-danger'},err):null, notice?e('div',{className:'alert alert-info py-2'},notice):null, busy?e('div',{className:'alert alert-secondary py-2'},'Working...'):null,
-      step===0 && e('div',{className:'card'},e('div',{className:'card-header'},'1. Upload Dataset'),e('div',{className:'card-body'},e('div',{className:'dropzone',onDragOver:ev=>{ev.preventDefault();ev.currentTarget.classList.add('dragover');},onDragLeave:ev=>ev.currentTarget.classList.remove('dragover'),onDrop:ev=>{ev.preventDefault();ev.currentTarget.classList.remove('dragover'); if(ev.dataTransfer.files[0]) onUpload(ev.dataTransfer.files[0]);},onClick:()=>document.getElementById('fileIn').click()},e('p',{className:'mb-1 fw-semibold'},'Drop CSV, TSV, XLSX, or JSON here'),e('p',{className:'text-muted small mb-0'},'or click to browse (max 50 MB)'),e('input',{id:'fileIn',type:'file',accept:'.csv,.tsv,.txt,.xlsx,.xls,.json',style:{display:'none'},onChange:ev=>onUpload(ev.target.files[0])})))),
-      step===1 && dataset && e('div',{className:'card'},e('div',{className:'card-header'},'2. Preview & Configuration'),e('div',{className:'card-body'},
-        e(StatCards,{items:[{label:'Rows',value:dataset.rows},{label:'Columns',value:dataset.columns},{label:'File',value:dataset.filename},{label:'Size',value:Math.round((dataset.size_bytes||0)/1024)+' KB'}]}),
-        e('h6',{className:'mt-2'},'Preview'), e(window.DataTable,{rows:dataset.preview,maxHeight:260}),
-        e('div',{className:'row g-3 mt-2'},
-          e('div',{className:'col-md-6'},e('label',{className:'form-label fw-semibold'},'Target column (optional)'),e('select',{className:'form-select',value:target,onChange:ev=>setTarget(ev.target.value)},e('option',{value:''},'(none)'),(dataset.column_names||[]).map(c=>e('option',{key:c,value:c},c)))),
-          e('div',{className:'col-md-6'},e('label',{className:'form-label fw-semibold'},'Learning task'),e('select',{className:'form-select',value:task,onChange:ev=>setTask(ev.target.value)},e('option',{value:''},'Select...'),e('option',{value:'supervised'},'Supervised'),e('option',{value:'unsupervised'},'Unsupervised')))
-        ),
-        e('div',{className:'mt-3 d-flex gap-2'},e('button',{className:'btn btn-primary',onClick:saveConfig,disabled:busy},'Continue to EDA'),e('button',{className:'btn btn-outline-secondary',onClick:()=>resetUI()},'Start over'))
-      )),
-      step===2 && dataset && e('div',{className:'card'},e('div',{className:'card-header'},'3. Exploratory Data Analysis'),e('div',{className:'card-body'},
-        !eda ? e('button',{className:'btn btn-primary',onClick:loadEda,disabled:busy},'Load EDA') : e('div',null,
-          e(StatCards,{items:[{label:'Rows',value:eda.n_rows},{label:'Columns',value:eda.n_columns},{label:'Missing',value:eda.missing_total+' ('+eda.missing_pct+'%)'},{label:'Duplicates',value:eda.duplicate_rows+' ('+eda.duplicate_pct+'%)'}]}),
-          e('h6',{className:'mt-2'},'Column types'), e(window.StatTable,{stats:eda.column_types}),
-          e('h6',{className:'mt-3'},'Descriptive statistics'), e(window.StatTable,{stats:eda.statistics}),
-          e('h6',{className:'mt-3'},'Missing values'), e(BarChart,{id:'missChart',labels:(eda.missing_values||[]).map(r=>r.column),values:(eda.missing_values||[]).map(r=>r.missing),title:'Missing',horizontal:true}),
-          e('h6',{className:'mt-3'},'Correlation (numeric)'), e(CorrHeat,{cols:eda.correlation_columns,matrix:eda.correlation_matrix}),
-          e('div',{className:'mt-3 d-flex gap-2 flex-wrap'},e('button',{className:'btn btn-primary',onClick:loadAnomalies,disabled:busy},'Detect issues'),e('button',{className:'btn btn-outline-secondary',onClick:doReset,disabled:busy},'Reset'),e('button',{className:'btn btn-outline-danger',onClick:doDelete,disabled:busy},'Delete'))
-        )
-      )),
-      step===3 && dataset && e('div',{className:'card'},e('div',{className:'card-header'},'4. Issues & Recommendations'),e('div',{className:'card-body'},
-        !anomalies ? e('p',null,'Loading...') : e('div',null,
-          e('p',{className:'text-muted'},'Total issues: '+anomalies.total_problems+'. Accept, reject, or choose another method.'),
-          e(window.ProblemsList,{problems:anomalies.problems,onAccept:acceptProblem,onReject:rejectProblem,onCustom:customProblem,acceptedIds:accepted}),
-          e('div',{className:'mt-3 d-flex gap-2 flex-wrap'},e('button',{className:'btn btn-primary',onClick:goClean},'Review operations ('+Object.keys(accepted).length+')'),e('button',{className:'btn btn-outline-secondary',onClick:()=>setStep(2)},'Back'),e('button',{className:'btn btn-outline-secondary',onClick:doReset,disabled:busy},'Reset'),e('button',{className:'btn btn-outline-danger',onClick:doDelete,disabled:busy},'Delete'))
-        )
-      )),
-      step===4 && dataset && e('div',{className:'card'},e('div',{className:'card-header'},'5. Apply Preprocessing'),e('div',{className:'card-body'},
-        Object.keys(accepted).length===0 ? e('div',{className:'alert alert-warning'},'No operations selected. Accept or customize issues on the previous step.') : null,
-        Object.keys(accepted).length===0 ? null : e('div',null,
-          e('h6',null,'Selected operations'), e('ul',null,Object.entries(accepted).map(([k,op])=>e('li',{key:k}, op.type+' - '+(op.feature||'(rows/dataset)')))),
-          e('div',{className:'d-flex gap-2 mt-2'},e('button',{className:'btn btn-primary',onClick:applyOps,disabled:busy},'Apply operations'))
-        ),
-        e('div',{className:'mt-3 d-flex gap-2'},e('button',{className:'btn btn-outline-secondary',onClick:()=>setStep(3)},'Back to Issues'),e('button',{className:'btn btn-primary',onClick:applyOps,disabled:busy||Object.keys(accepted).length===0},'Apply operations'))
-      )),
-      step===5 && dataset && e('div',{className:'card'},e('div',{className:'card-header'},'6. Results & Comparison'),e('div',{className:'card-body'},
-        result && e('div',{className:'alert alert-success py-2 mb-3'},'Applied. Rows: '+result.rows+', Cols: '+result.columns+', Missing: '+result.missing_total+', Duplicates: '+result.duplicate_rows),
-        comparison && e('div',null,
-          e('div',{className:'row g-3 mb-3'},
-            e('div',{className:'col-md-6'},e('div',{className:'card h-100'},e('div',{className:'card-body'},e('h6',null,'Original'),e(StatCards,{items:[{label:'Rows',value:comparison.original.rows},{label:'Cols',value:comparison.original.columns},{label:'Missing',value:comparison.original.missing_total},{label:'Dupes',value:comparison.original.duplicate_rows}]})))),
-            e('div',{className:'col-md-6'},e('div',{className:'card h-100'},e('div',{className:'card-body'},e('h6',null,'Cleaned'),e(StatCards,{items:[{label:'Rows',value:comparison.cleaned.rows},{label:'Cols',value:comparison.cleaned.columns},{label:'Missing',value:comparison.cleaned.missing_total},{label:'Dupes',value:comparison.cleaned.duplicate_rows}]}))))
-          ),
-          e('h6',null,'Cleaned preview'), e(window.DataTable,{rows:(comparison.cleaned||{}).preview,maxHeight:280}),
-          e('h6',{className:'mt-3'},'Applied log'), e('pre',{style:{background:'#f8f9fa',padding:12,borderRadius:8,maxHeight:220,overflow:'auto',fontSize:'0.8rem'}},JSON.stringify(comparison.log,null,2))
-        ),
-        e('div',{className:'d-flex gap-2 mt-3 flex-wrap'},
-          comparison && e('button',{className:'btn btn-primary',onClick:()=>exportRows((comparison.cleaned||{}).preview,'cleaned_preview.csv')},'Export cleaned preview'),
-          comparison && e('button',{className:'btn btn-outline-primary',onClick:()=>exportRows((comparison.original||{}).preview,'original_preview.csv')},'Export original preview'),
-          e('button',{className:'btn btn-outline-secondary',onClick:doReset,disabled:busy},'Reset & re-clean'),
-          e('button',{className:'btn btn-outline-danger',onClick:doDelete,disabled:busy},'Delete dataset'),
-          e('button',{className:'btn btn-outline-secondary',onClick:()=>setStep(3)},'Back to issues')
-        )
-      ))
-    ),
-    e('div',{className:'footer'},'Generic Data Preprocessing & Cleaning Web Application for Machine Learning')
-  );
-}
+const App = () => {
+  const [activePage, setActivePage] = useState('upload');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dataset, setDataset] = useState(null);
+  const [target, setTarget] = useState('');
+  const [task, setTask] = useState('');
+  const [eda, setEda] = useState(null);
+  const [quality, setQuality] = useState(null);
+  const [explorerData, setExplorerData] = useState(null);
+  const [advisor, setAdvisor] = useState(null);
+  const [comparison, setComparison] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [acceptedIssues, setAcceptedIssues] = useState({});
+  const [selectedOperations, setSelectedOperations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  // Navigation handlers
+  const navigate = useCallback((page) => {
+    setActivePage(page);
+    setSidebarOpen(false);
+  }, []);
+
+  // Upload handler
+  const handleUpload = async (file) => {
+    setError('');
+    setNotice('');
+    setLoading(true);
+    try {
+      const res = await window.uploadFile(file);
+      setDataset(res);
+      setTarget('');
+      setTask('');
+      setEda(null);
+      setQuality(null);
+      setExplorerData(null);
+      setAdvisor(null);
+      setComparison(null);
+      setHistory([]);
+      setAcceptedIssues({});
+      setSelectedOperations([]);
+      navigate('dashboard');
+      setNotice('Uploaded: ' + res.filename);
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save config (target & task)
+  const saveConfig = async () => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      await window.api('/dataset/' + dataset.dataset_id + '/target', {
+        method: 'POST',
+        body: JSON.stringify({ target: target || null }),
+      });
+      if (task) {
+        await window.api('/dataset/' + dataset.dataset_id + '/task', {
+          method: 'POST',
+          body: JSON.stringify({ task }),
+        });
+      }
+      setDataset(d => ({ ...d, target: target || null, task: task || null }));
+      navigate('dashboard');
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load EDA
+  const loadEda = async () => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      const data = await window.api('/dataset/' + dataset.dataset_id + '/eda');
+      setEda(data);
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load Data Quality
+  const loadQuality = async () => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      const data = await window.getDataQuality(dataset.dataset_id);
+      setQuality(data);
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load Explorer
+  const loadExplorer = async (params = {}) => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      const data = await window.getExplorerData(dataset.dataset_id, params);
+      setExplorerData(data);
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load Advisor
+  const loadAdvisor = async () => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      const data = await window.getDataAdvisor(dataset.dataset_id);
+      setAdvisor(data);
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Accept/Reject/Custom issues
+  const acceptIssue = (id, issue) => {
+    if (issue.recommendation === 'none') return;
+    setAcceptedIssues(prev => ({ ...prev, [id]: { type: issue.recommendation, feature: issue.feature === '__rows__' ? null : issue.feature } }));
+  };
+
+  const rejectIssue = (id) => {
+    setAcceptedIssues(prev => { const n = { ...prev }; delete n[id]; return n; });
+  };
+
+  const customIssue = (id, method, issue) => {
+    if (!method) return;
+    setAcceptedIssues(prev => ({ ...prev, [id]: { type: method, feature: issue.feature === '__rows__' ? null : issue.feature } }));
+  };
+
+  // Apply operations
+  const applyOperations = async () => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      const ops = Object.values(acceptedIssues);
+      await window.api('/dataset/' + dataset.dataset_id + '/operations', {
+        method: 'POST',
+        body: JSON.stringify({ operations: ops }),
+      });
+      const result = await window.api('/dataset/' + dataset.dataset_id + '/apply', { method: 'POST' });
+      const comp = await window.api('/dataset/' + dataset.dataset_id + '/comparison');
+      const hist = await window.getHistory(dataset.dataset_id);
+      setComparison(comp);
+      setHistory(hist.history || []);
+      setSelectedOperations([]);
+      setAcceptedIssues({});
+      setNotice('Applied ' + ops.length + ' operation(s).');
+      navigate('comparison');
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Reset dataset
+  const doReset = async () => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      await window.api('/dataset/' + dataset.dataset_id + '/reset', { method: 'POST' });
+      setComparison(null);
+      setAcceptedIssues({});
+      setQuality(null);
+      setEda(null);
+      setSelectedOperations([]);
+      setNotice('Reset to original.');
+      navigate('dashboard');
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Undo operation
+  const doUndo = async () => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      const result = await window.undoOperation(dataset.dataset_id);
+      const hist = await window.getHistory(dataset.dataset_id);
+      setHistory(hist.history || []);
+      setNotice('Undid last operation.');
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete dataset
+  const doDelete = async () => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      await window.api('/dataset/' + dataset.dataset_id, { method: 'DELETE' });
+      resetUI('Dataset deleted.');
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle class balancing
+  const handleBalance = async (body) => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      await window.balanceClasses(dataset.dataset_id, body);
+      const comp = await window.api('/dataset/' + dataset.dataset_id + '/comparison');
+      const hist = await window.getHistory(dataset.dataset_id);
+      setComparison(comp);
+      setHistory(hist.history || []);
+      setNotice('Class balancing applied.');
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Export data
+  const handleExport = async (format, datasetType, options = {}) => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      const blob = await window.exportDataset(dataset.dataset_id, {
+        format,
+        dataset: datasetType,
+        ...options,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dataset.filename.rsplit('.', 1)[0]}_${datasetType}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setNotice('Export completed.');
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate report
+  const handleGenerateReport = async () => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      const report = await window.generateReport(dataset.dataset_id);
+      return report;
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Advisor action
+  const handleAdvisorAction = async (action, columns, details) => {
+    if (!dataset) return;
+    setError('');
+    setLoading(true);
+    try {
+      // Map advisor actions to operations
+      const actionMap = {
+        'impute_or_drop': columns.map(c => ({ type: 'median_imputation', feature: c, params: {} })),
+        'drop_column': columns.map(c => ({ type: 'drop_column', feature: c, params: {} })),
+        'drop_columns': columns.map(c => ({ type: 'drop_column', feature: c, params: {} })),
+        'balance_classes': columns.map(c => ({ type: 'smote', feature: c, params: {} })),
+        'scale_features': columns.map(c => ({ type: 'standardization', feature: c, params: {} })),
+        'encode_categorical': columns.map(c => ({ type: 'one_hot_encoding', feature: c, params: {} })),
+        'handle_outliers': columns.map(c => ({ type: 'clip_iqr', feature: c, params: {} })),
+        'extract_date_features': columns.map(c => ({ type: 'extract_date_features', feature: c, params: {} })),
+      };
+      
+      const ops = actionMap[action] || [];
+      if (ops.length > 0) {
+        await window.api('/dataset/' + dataset.dataset_id + '/operations', {
+          method: 'POST',
+          body: JSON.stringify({ operations: ops }),
+        });
+        const result = await window.api('/dataset/' + dataset.dataset_id + '/apply', { method: 'POST' });
+        const comp = await window.api('/dataset/' + dataset.dataset_id + '/comparison');
+        const hist = await window.getHistory(dataset.dataset_id);
+        setComparison(comp);
+        setHistory(hist.history || []);
+        setNotice('Advisor recommendation applied.');
+      }
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load data when page changes
+  useEffect(() => {
+    if (dataset) {
+      switch (activePage) {
+        case 'dashboard':
+          if (!eda) loadEda();
+          if (!quality) loadQuality();
+          break;
+        case 'explorer':
+          if (!explorerData) loadExplorer();
+          break;
+        case 'quality':
+          if (!quality) loadQuality();
+          break;
+        case 'advisor':
+          if (!advisor) loadAdvisor();
+          break;
+        case 'comparison':
+          if (!comparison) {
+            window.api('/dataset/' + dataset.dataset_id + '/comparison').then(setComparison);
+          }
+          if (!history.length) {
+            window.getHistory(dataset.dataset_id).then(h => setHistory(h.history || []));
+          }
+          break;
+        case 'history':
+          if (!history.length) {
+            window.getHistory(dataset.dataset_id).then(h => setHistory(h.history || []));
+          }
+          break;
+      }
+    }
+  }, [activePage, dataset]);
+
+  const resetUI = (msg) => {
+    setDataset(null);
+    setTarget('');
+    setTask('');
+    setEda(null);
+    setQuality(null);
+    setExplorerData(null);
+    setAdvisor(null);
+    setComparison(null);
+    setHistory([]);
+    setAcceptedIssues({});
+    setSelectedOperations([]);
+    setActivePage('upload');
+    setError('');
+    if (msg) setNotice(msg);
+  };
+
+  // Auto-load EDA when on dashboard
+  useEffect(() => {
+    if (activePage === 'dashboard' && dataset && !eda) {
+      loadEda();
+    }
+  }, [activePage, dataset, eda]);
+
+  // Render current page
+  const renderPage = () => {
+    switch (activePage) {
+      case 'upload':
+        return e(Upload, { onUpload: handleUpload, onNavigate: navigate, loading, dataset });
+      case 'dashboard':
+        return e(Dashboard, { 
+          dataset, 
+          eda, 
+          quality, 
+          recentOperations: history?.slice(0, 5) || [],
+          onNavigate: navigate,
+          loading,
+          target,
+          task,
+          onSaveConfig: saveConfig,
+        });
+      case 'explorer':
+        return e(DatasetExplorer, { 
+          dataset, 
+          explorerData, 
+          onExplore: loadExplorer,
+          onExport: handleExport,
+          loading,
+        });
+      case 'quality':
+        return e(DataQualityCenter, { 
+          quality, 
+          onAcceptIssue: acceptIssue,
+          onRejectIssue: rejectIssue,
+          onCustomIssue: customIssue,
+          acceptedIssues,
+          loading,
+        });
+      case 'preprocessing':
+        return e(PreprocessingStudio, { 
+          dataset, 
+          quality, 
+          acceptedIssues, 
+          onApplyOperations: applyOperations,
+          onPreviewOperation: async () => {},
+          operations: selectedOperations,
+          loading,
+        });
+      case 'balancing':
+        return e(ClassBalancing, { 
+          dataset, 
+          target, 
+          task,
+          classDistribution: eda?.categorical_distributions?.[target]?.top_values?.reduce((acc, v) => ({ ...acc, [v.value]: v.count }), {}) || {},
+          onBalance: handleBalance,
+          loading,
+          onNavigate: navigate,
+        });
+      case 'comparison':
+        return e(Comparison, { 
+          comparison, 
+          dataset,
+          onExport: handleExport,
+        });
+      case 'history':
+        return e(History, { 
+          history, 
+          dataset,
+          onUndo: doUndo,
+          onReset: doReset,
+          loading,
+        });
+      case 'advisor':
+        return e(DataAdvisor, { 
+          advisor, 
+          dataset,
+          onAction: handleAdvisorAction,
+          loading,
+        });
+      case 'export':
+        return e(ExportReports, { 
+          dataset, 
+          report: comparison,
+          onExport: handleExport,
+          onGenerateReport: handleGenerateReport,
+          loading,
+        });
+      default:
+        return e(Dashboard, { dataset, eda, quality, onNavigate: navigate, loading });
+    }
+  };
+
+  return e('div', { className: 'app-root' }, [
+    e(SidebarProvider, { key: 'provider' }, [
+      e(Sidebar, { 
+        key: 'sidebar', 
+        activePage, 
+        onNavigate: navigate,
+      }),
+      e('main', { key: 'main', className: 'main-content' }, [
+        e(Header, { 
+          key: 'header',
+          title: activePage.charAt(0).toUpperCase() + activePage.slice(1).replace(/([A-Z])/g, ' $1'),
+          breadcrumbs: dataset ? [{ label: dataset.filename, href: '#' }] : [],
+        }),
+        e('div', { key: 'content', className: 'page-content' }, [
+          error && e('div', { className: 'alert alert-danger mb-3', role: 'alert' }, error),
+          notice && e('div', { className: 'alert alert-info mb-3', role: 'alert' }, notice),
+          loading && e('div', { className: 'alert alert-secondary mb-3', role: 'status' }, 'Working...'),
+          renderPage(),
+        ]),
+      ]),
+    ]),
+  ]);
+};
+
+// Initialize
 ReactDOM.createRoot(document.getElementById('root')).render(e(App));
-})();
+
+// Expose globally for debugging
+window.App = App;

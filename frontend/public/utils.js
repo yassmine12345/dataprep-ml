@@ -42,4 +42,41 @@ function csvFromRows(rows, columns) {
   }).join(',')).join('\n');
   return header + '\n' + body;
 }
-window.fmt=fmt;window.pct=pct;window.pill=pill;window.download=download;window.csvFromRows=csvFromRows;
+
+function formatTimestamp(ts) {
+  return new Date(ts * 1000).toLocaleString();
+}
+
+function formatDiff(diff) {
+  if (diff === 0) return '—';
+  return diff > 0 ? '+' + diff.toLocaleString() : diff.toLocaleString();
+}
+
+function debounce(fn, delay) {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+}
+
+function throttle(fn, limit) {
+  let inThrottle;
+  return (...args) => {
+    if (!inThrottle) {
+      fn(...args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}
+
+window.fmt = fmt;
+window.pct = pct;
+window.pill = pill;
+window.download = download;
+window.csvFromRows = csvFromRows;
+window.formatTimestamp = formatTimestamp;
+window.formatDiff = formatDiff;
+window.debounce = debounce;
+window.throttle = throttle;
