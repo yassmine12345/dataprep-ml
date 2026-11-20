@@ -1,4 +1,4 @@
-# Build timestamp: 2026-11-20T14:15:00Z - Force rebuild for frontend assets
+# Build timestamp: 2026-11-20T14:20:00Z - Force rebuild for frontend assets
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -11,8 +11,10 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend /app/backend
 
 # Build dist from public/ so FastAPI can serve the frontend
+# Use a build arg to bust cache when frontend changes
+ARG FRONTEND_VERSION=20261120
 COPY frontend /app/frontend
-RUN mkdir -p /app/frontend/dist && cp -r /app/frontend/public/* /app/frontend/dist/
+RUN mkdir -p /app/frontend/dist && cp -r /app/frontend/public/* /app/frontend/dist/ && ls -la /app/frontend/dist/
 
 # Platforms inject PORT at runtime; default to 8080
 ENV PORT=8080
