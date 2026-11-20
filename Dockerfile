@@ -1,3 +1,4 @@
+# Build timestamp: 2026-11-20T14:15:00Z - Force rebuild for frontend assets
 FROM python:3.11-slim
 
 WORKDIR /app
